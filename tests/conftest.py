@@ -1,5 +1,11 @@
 """Shared test fixtures and configuration."""
 
+import sys
+import os
+
+# Ensure project root is on sys.path regardless of how pytest is invoked
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncio
 import pytest
 import pytest_asyncio
