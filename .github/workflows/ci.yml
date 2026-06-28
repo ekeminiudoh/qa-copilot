@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      PYTHONPATH: .
       DATABASE_URL: sqlite+aiosqlite:///./test_ci.db
       JWT_SECRET_KEY: ci-test-secret-key-32-chars-minimum
       ENVIRONMENT: development
@@ -36,10 +35,13 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+
       - name: Run tests
         id: run_tests
         run: |
-          pytest tests/ -v \
+          python -m pytest tests/ -v \
             --tb=short \
             --junit-xml=test-results.xml \
             --cov=backend \
