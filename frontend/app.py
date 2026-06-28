@@ -164,6 +164,8 @@ def sidebar():
             "Dashboard": "📊",
             "Chat": "💬",
             "Gaming Tests": "🎮",
+            "Fintech Tests": "💳",
+            "Train AI": "🧠",
             "Test Cases": "🧪",
             "SQL Review": "🗄️",
             "Security Review": "🔒",
@@ -262,6 +264,15 @@ def page_chat():
         if st.button("🗑️ Clear Chat"):
             st.session_state.chat_history = []
             st.rerun()
+        if st.button("🧠 Save Chat as Training"):
+            if st.session_state.chat_history:
+                label = f"chat-{len(st.session_state.chat_history)}-msgs"
+                result = api_post("/api/knowledge/save-chat-training", {
+                    "messages": st.session_state.chat_history,
+                    "label": label,
+                })
+                if result:
+                    st.success(result.get("message", "Chat saved for AI training!"))
 
     # Display history
     for msg in st.session_state.chat_history:
@@ -657,6 +668,236 @@ def page_user_management():
                 st.rerun()
 
 
+def page_train_ai():
+    st.title("🧠 Train AI")
+    st.caption("Paste any document to teach the AI about your systems. It will use this context in all future answers.")
+
+    st.info(
+        "**What to paste here:** Test case sheets · Requirements · Acceptance criteria · "
+        "Jira descriptions · API specs · Bug reports · Previous QA sessions · Moniepoint flow docs"
+    )
+
+    with st.form("train_form"):
+        title = st.text_input("Document Title", placeholder="e.g. Moniepoint Outbound Transfer Requirements v2")
+        category = st.selectbox(
+            "Category",
+            ["requirements", "test-cases", "jira", "fintech", "gaming", "acceptance-criteria", "bug-report", "api-spec", "general"],
+        )
+        content = st.text_area(
+            "Paste content here",
+            height=350,
+            placeholder="Paste your test sheet, requirement doc, Jira ticket, acceptance criteria, API spec, or any other document...",
+        )
+        submitted = st.form_submit_button("📥 Train AI with this document", type="primary", use_container_width=True)
+
+    if submitted:
+        if not title.strip() or not content.strip():
+            st.error("Title and content are required.")
+        else:
+            result = api_post("/api/knowledge/ingest-text", {
+                "title": title,
+                "content": content,
+                "category": category,
+            })
+            if result:
+                st.success(f"✅ {result['message']}")
+                st.metric("Chunks indexed", result.get("chunks", 0))
+
+    st.divider()
+    st.subheader("📚 What the AI Has Learned")
+    docs = api_get("/api/knowledge/documents") or []
+    if docs:
+        training_docs = [d for d in docs if d.get("file_type") not in ("pdf", "docx", "txt")]
+        all_docs = docs
+
+        tab1, tab2 = st.tabs([f"All Documents ({len(all_docs)})", f"Pasted Training ({len(training_docs)})"])
+
+        with tab1:
+            for d in all_docs:
+                col1, col2, col3 = st.columns([3, 2, 1])
+                col1.write(f"**{d['filename']}**")
+                col2.write(f"`{d['file_type']}` · {d['chunk_count']} chunks")
+                col3.write("✅ Indexed" if d["status"] == "indexed" else d["status"])
+
+        with tab2:
+            if training_docs:
+                for d in training_docs:
+                    st.write(f"🧠 **{d['filename']}** · `{d['file_type']}` · {d['chunk_count']} chunks")
+            else:
+                st.info("No pasted training documents yet. Use the form above to add some.")
+    else:
+        st.info("No documents indexed yet.")
+
+
+def page_fintech_tests():
+    st.title("💳 Fintech Tests")
+    st.caption("Moniepoint payment flow testing — inbound transfers, outbound transfers, validations, reversals")
+
+    CHECKS = ["debit_correct", "credit_correct", "balance_updated", "transaction_recorded", "notification_received", "response_time_ok"]
+    CHECK_LABELS = {
+        "debit_correct": "Debit ✓",
+        "credit_correct": "Credit ✓",
+        "balance_updated": "Balance Updated",
+        "transaction_recorded": "Transaction Recorded",
+        "notification_received": "Notification",
+        "response_time_ok": "Response Time",
+    }
+
+    # Session setup
+    with st.expander("⚙️ Session Setup", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        session_name = c1.text_input("Session Name", placeholder="e.g. Moniepoint Outbound June 28")
+        environment  = c2.selectbox("Environment", ["Staging", "UAT", "Production"])
+        currency     = c3.text_input("Currency", value="NGN")
+
+    st.divider()
+
+    # Quick test builder
+    st.subheader("📋 Add Test Scenarios")
+    st.caption("Add each payment scenario you want to test")
+
+    if "fintech_tests" not in st.session_state:
+        st.session_state.fintech_tests = []
+
+    # Quick add form
+    with st.expander("➕ Add Test Scenario", expanded=len(st.session_state.fintech_tests) == 0):
+        with st.form("add_fintech_test"):
+            fc1, fc2 = st.columns(2)
+            test_type = fc1.selectbox("Test Type", ["outbound", "inbound", "validation", "reversal"])
+            scenario  = fc2.text_input("Scenario", placeholder="e.g. Transfer ₦5,000 to GTBank account")
+            fc3, fc4, fc5, fc6 = st.columns(4)
+            amount          = fc3.text_input("Amount (NGN)", placeholder="5000")
+            sender_account  = fc4.text_input("Sender Account", placeholder="0123456789")
+            receiver_account = fc5.text_input("Receiver Account", placeholder="0987654321")
+            bal_before      = fc6.text_input("Balance Before", placeholder="10000")
+
+            if st.form_submit_button("Add Scenario", type="primary"):
+                if scenario.strip():
+                    st.session_state.fintech_tests.append({
+                        "test_type": test_type,
+                        "scenario": scenario,
+                        "amount": amount,
+                        "sender_account": sender_account,
+                        "receiver_account": receiver_account,
+                        "balance_before": bal_before,
+                        "balance_after": "",
+                        "debit_correct": "OK",
+                        "credit_correct": "OK",
+                        "balance_updated": "OK",
+                        "transaction_recorded": "OK",
+                        "notification_received": "OK",
+                        "response_time_ok": "OK",
+                        "issue_description": "",
+                        "screenshot_url": "",
+                    })
+                    st.rerun()
+
+    # Bulk paste option
+    with st.expander("📋 Bulk Paste Scenarios"):
+        bulk = st.text_area(
+            "One scenario per line: type | scenario | amount",
+            placeholder="outbound | Transfer ₦5000 to GTBank | 5000\ninbound | Receive ₦10000 from Zenith | 10000\nvalidation | Invalid account number | 0",
+            height=120,
+        )
+        if st.button("Load Bulk Scenarios"):
+            for line in bulk.strip().splitlines():
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) >= 2:
+                    st.session_state.fintech_tests.append({
+                        "test_type": parts[0] if parts[0] in ["outbound","inbound","validation","reversal"] else "outbound",
+                        "scenario": parts[1] if len(parts) > 1 else "",
+                        "amount": parts[2] if len(parts) > 2 else "",
+                        "sender_account": "", "receiver_account": "",
+                        "balance_before": "", "balance_after": "",
+                        "debit_correct": "OK", "credit_correct": "OK",
+                        "balance_updated": "OK", "transaction_recorded": "OK",
+                        "notification_received": "OK", "response_time_ok": "OK",
+                        "issue_description": "", "screenshot_url": "",
+                    })
+            st.rerun()
+
+    # Results table
+    if st.session_state.fintech_tests:
+        st.divider()
+        st.subheader(f"✅ Mark Results — {len(st.session_state.fintech_tests)} Scenarios")
+
+        TYPE_EMOJI = {"outbound": "⬆️", "inbound": "⬇️", "validation": "🔍", "reversal": "↩️"}
+
+        for idx, test in enumerate(st.session_state.fintech_tests):
+            emoji = TYPE_EMOJI.get(test["test_type"], "🔵")
+            with st.expander(f"{emoji} {idx+1}. [{test['test_type'].upper()}] {test['scenario']}", expanded=False):
+                cols = st.columns(len(CHECKS))
+                any_fail = False
+                for ci, ck in enumerate(CHECKS):
+                    current = test[ck] == "OK"
+                    toggled = cols[ci].checkbox(CHECK_LABELS[ck], value=current, key=f"ft_{idx}_{ck}")
+                    st.session_state.fintech_tests[idx][ck] = "OK" if toggled else "-"
+                    if not toggled:
+                        any_fail = True
+
+                rc1, rc2, rc3 = st.columns(3)
+                bal_after = rc1.text_input("Balance After", value=test.get("balance_after",""), key=f"baf_{idx}")
+                st.session_state.fintech_tests[idx]["balance_after"] = bal_after
+
+                if any_fail:
+                    issue = rc2.text_input("Issue Description", value=test.get("issue_description",""), key=f"ft_issue_{idx}")
+                    ss    = rc3.text_input("Screenshot URL", value=test.get("screenshot_url",""), key=f"ft_ss_{idx}")
+                    st.session_state.fintech_tests[idx]["issue_description"] = issue
+                    st.session_state.fintech_tests[idx]["screenshot_url"] = ss
+
+                if st.button("🗑️ Remove", key=f"rm_ft_{idx}"):
+                    st.session_state.fintech_tests.pop(idx)
+                    st.rerun()
+
+        # Summary
+        st.divider()
+        total  = len(st.session_state.fintech_tests)
+        passed = sum(1 for t in st.session_state.fintech_tests if all(t[c] == "OK" for c in CHECKS))
+        failed = total - passed
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("Total", total)
+        s2.metric("✅ Passed", passed)
+        s3.metric("❌ Failed", failed)
+        s4.metric("Pass Rate", f"{passed/total*100:.0f}%" if total else "0%")
+
+        st.divider()
+        ec1, ec2 = st.columns(2)
+
+        with ec1:
+            if st.button("📊 Export Excel Report", type="primary", use_container_width=True):
+                payload = {
+                    "session_name": session_name,
+                    "environment": environment,
+                    "currency": currency,
+                    "tests": st.session_state.fintech_tests,
+                }
+                try:
+                    resp = requests.post(
+                        f"{API_BASE}/api/fintech/report/excel",
+                        headers=_headers(), json=payload, timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        st.download_button(
+                            "⬇️ Download Excel",
+                            data=resp.content,
+                            file_name=f"fintech_test_{session_name or 'report'}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.error(f"Export failed: {resp.text[:200]}")
+                except Exception as e:
+                    st.error(f"Export error: {e}")
+
+        with ec2:
+            if st.button("🗑️ Clear All", use_container_width=True):
+                st.session_state.fintech_tests = []
+                st.rerun()
+    else:
+        st.info("Add test scenarios above to get started.")
+
+
 def page_gaming_tests():
     st.title("🎮 Gaming Tests")
     st.caption("Record game test results and export your QA report in one click")
@@ -846,6 +1087,8 @@ PAGE_MAP = {
     "Dashboard": page_dashboard,
     "Chat": page_chat,
     "Gaming Tests": page_gaming_tests,
+    "Fintech Tests": page_fintech_tests,
+    "Train AI": page_train_ai,
     "Test Cases": page_test_cases,
     "SQL Review": page_sql_review,
     "Security Review": page_security_review,

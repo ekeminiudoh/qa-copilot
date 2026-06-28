@@ -14,6 +14,7 @@ from backend.api.qa_operations import router as qa_router
 from backend.api.reports import router as reports_router
 from backend.api.knowledge import router as knowledge_router
 from backend.api.gaming import router as gaming_router
+from backend.api.fintech import router as fintech_router
 from backend.config import settings
 from backend.core.logger import logger, setup_logger
 from backend.db import init_db
@@ -83,6 +84,7 @@ app.include_router(qa_router)
 app.include_router(reports_router)
 app.include_router(knowledge_router)
 app.include_router(gaming_router)
+app.include_router(fintech_router)
 
 frontend_dir = Path(settings.frontend_path)
 if frontend_dir.exists():
