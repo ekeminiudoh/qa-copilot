@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env.local
+
+# Database (runtime data)
+*.db
+*.db-shm
+*.db-wal
+
+# Vector store (regenerated on startup)
+.chroma_db/
+
+# Logs (runtime)
+logs/
+*.log
+
+# Uploads & reports (runtime data)
+uploads/
+reports/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+test_*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — NEVER commit .env
+.env

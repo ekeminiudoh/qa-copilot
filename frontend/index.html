@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Copilot</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6fb; color: #111; }
+    .app { max-width: 900px; margin: 0 auto; padding: 24px; }
+    h1 { margin-bottom: 16px; }
+    textarea, input, button { width: 100%; box-sizing: border-box; margin-top: 8px; }
+    textarea { min-height: 140px; padding: 12px; border: 1px solid #ccd7e0; border-radius: 8px; }
+    button { padding: 12px 16px; border: none; border-radius: 8px; background: #4f46e5; color: white; cursor: pointer; }
+    button:hover { background: #4338ca; }
+    .response { margin-top: 20px; white-space: pre-wrap; padding: 16px; background: white; border-radius: 12px; border: 1px solid #dfe3ea; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>QA Copilot</h1>
+    <textarea id="query" placeholder="Ask the Copilot a question..."></textarea>
+    <input id="agent" placeholder="Optional agent (analyst, developer, tester, sql, automation, documentation)" />
+    <button id="submit">Send</button>
+    <div class="response" id="response"></div>
+  </div>
+
+  <script>
+    const queryInput = document.getElementById('query');
+    const agentInput = document.getElementById('agent');
+    const submitButton = document.getElementById('submit');
+    const responseDiv = document.getElementById('response');
+
+    submitButton.addEventListener('click', async () => {
+      const query = queryInput.value.trim();
+      const agent = agentInput.value.trim() || undefined;
+      if (!query) {
+        responseDiv.textContent = 'Please enter a question.';
+        return;
+      }
+
+      const body = { query };
+      if (agent) body.agent = agent;
+
+      const res = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        responseDiv.textContent = data.detail || 'Request failed.';
+        return;
+      }
+      responseDiv.textContent = `Agent: ${data.agent}\n\n${data.response}`;
+    });
+  </script>
+</body>
+</html>

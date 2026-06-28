@@ -1,0 +1,73 @@
+# Web framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Configuration & validation
+python-dotenv
+pydantic>=2.0.0
+pydantic-settings
+pydantic[email]
+email-validator
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt>=4.0.1,<5.0.0
+
+# Database
+sqlalchemy
+alembic
+aiosqlite
+
+# LLM & AI
+openai
+langgraph
+langchain
+langchain-community
+tiktoken
+
+# Vector store & embeddings
+chromadb
+sentence-transformers
+
+# Document processing
+PyPDF2
+pymupdf
+python-docx
+unstructured
+pytesseract
+Pillow
+
+# Reporting
+pandas
+openpyxl
+reportlab
+python-docx
+jinja2
+
+# HTTP clients
+httpx
+requests
+
+# Discord
+discord.py
+
+# Logging
+loguru
+
+# Async utilities
+anyio
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# Linting / type checking
+flake8
+mypy
+
+# Dev
+streamlit
