@@ -163,6 +163,7 @@ def sidebar():
         pages = {
             "Dashboard": "📊",
             "Chat": "💬",
+            "Gaming Tests": "🎮",
             "Test Cases": "🧪",
             "SQL Review": "🗄️",
             "Security Review": "🔒",
@@ -656,11 +657,195 @@ def page_user_management():
                 st.rerun()
 
 
+def page_gaming_tests():
+    st.title("🎮 Gaming Tests")
+    st.caption("Record game test results and export your QA report in one click")
+
+    # ── Session Setup ─────────────────────────────────────────────────────────
+    with st.expander("⚙️ Session Setup", expanded=True):
+        c1, c2, c3, c4 = st.columns(4)
+        session_name = c1.text_input("Session Name", placeholder="e.g. Booming Games June 28")
+        min_bet = c2.text_input("Min Bet", value="1")
+        max_bet = c3.text_input("Max Bet", value="5000")
+        currency = c4.text_input("Currency", value="LSL")
+
+    st.divider()
+
+    # ── Game List Builder ─────────────────────────────────────────────────────
+    st.subheader("📋 Game List")
+    st.caption("Paste your game list below — one game per line as: Provider | Game Name")
+
+    sample = "Booming | Cash Pig 2\nEvoplay | Cricket Duel\nOaks | Lord of Thunder\nScatterkings | 10 Sliding Wilds"
+    raw_list = st.text_area("Paste game list", height=150, placeholder=sample)
+
+    if "gaming_games" not in st.session_state:
+        st.session_state.gaming_games = []
+
+    if st.button("📥 Load Games", type="primary"):
+        games = []
+        for line in raw_list.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if "|" in line:
+                parts = line.split("|", 1)
+                provider = parts[0].strip().rstrip(":")
+                name = parts[1].strip()
+            else:
+                provider = ""
+                name = line.strip()
+            games.append({
+                "provider": provider, "game_name": name,
+                "game_image": "OK", "launch_and_play": "OK",
+                "debit": "OK", "credit": "OK", "min_max_bet": "OK",
+                "issue_description": "", "screenshot_url": "",
+            })
+        st.session_state.gaming_games = games
+        st.success(f"Loaded {len(games)} games. Mark results below.")
+        st.rerun()
+
+    # ── Result Entry ──────────────────────────────────────────────────────────
+    if st.session_state.gaming_games:
+        st.divider()
+        st.subheader(f"✅ Mark Results — {len(st.session_state.gaming_games)} Games")
+        st.caption("Toggle each check. Any FAIL will prompt for issue description.")
+
+        CHECKS = ["game_image", "launch_and_play", "debit", "credit", "min_max_bet"]
+        CHECK_LABELS = {
+            "game_image": "Game Image",
+            "launch_and_play": "Launch & Play",
+            "debit": "Debit",
+            "credit": "Credit",
+            "min_max_bet": "Min/Max Bet",
+        }
+
+        # Column headers
+        hdr = st.columns([1, 2, 3, 2, 2, 2, 2, 2])
+        hdr[0].markdown("**#**")
+        hdr[1].markdown("**Provider**")
+        hdr[2].markdown("**Game Name**")
+        for i, ck in enumerate(CHECKS):
+            hdr[3 + i].markdown(f"**{CHECK_LABELS[ck]}**")
+
+        for idx, game in enumerate(st.session_state.gaming_games):
+            cols = st.columns([1, 2, 3, 2, 2, 2, 2, 2])
+            cols[0].write(idx + 1)
+            cols[1].write(game["provider"])
+            cols[2].write(game["game_name"])
+
+            any_fail = False
+            for ci, ck in enumerate(CHECKS):
+                current = game[ck] == "OK"
+                toggled = cols[3 + ci].checkbox(
+                    "OK", value=current,
+                    key=f"g_{idx}_{ck}",
+                    label_visibility="visible"
+                )
+                st.session_state.gaming_games[idx][ck] = "OK" if toggled else "-"
+                if not toggled:
+                    any_fail = True
+
+            if any_fail:
+                with st.expander(f"⚠️ Issue for {game['game_name']}", expanded=False):
+                    issue = st.text_input(
+                        "Bug Description",
+                        value=game.get("issue_description", ""),
+                        key=f"issue_{idx}",
+                        placeholder="e.g. game launch fail with blank white screen",
+                    )
+                    screenshot = st.text_input(
+                        "Screenshot URL",
+                        value=game.get("screenshot_url", ""),
+                        key=f"ss_{idx}",
+                        placeholder="https://jam.dev/c/...",
+                    )
+                    st.session_state.gaming_games[idx]["issue_description"] = issue
+                    st.session_state.gaming_games[idx]["screenshot_url"] = screenshot
+
+        st.divider()
+
+        # ── Live Summary ──────────────────────────────────────────────────────
+        total = len(st.session_state.gaming_games)
+        passed = sum(
+            1 for g in st.session_state.gaming_games
+            if all(g[c] == "OK" for c in CHECKS)
+        )
+        failed = total - passed
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("Total Games", total)
+        s2.metric("✅ Tested OK", passed)
+        s3.metric("❌ Open Issues", failed)
+        s4.metric("Pass Rate", f"{passed/total*100:.0f}%" if total else "0%")
+
+        st.divider()
+
+        # ── Export ────────────────────────────────────────────────────────────
+        col_exp, col_script = st.columns(2)
+
+        with col_exp:
+            if st.button("📊 Export Excel Report", type="primary", use_container_width=True):
+                payload = {
+                    "session_name": session_name,
+                    "min_bet": min_bet,
+                    "max_bet": max_bet,
+                    "currency": currency,
+                    "games": st.session_state.gaming_games,
+                }
+                try:
+                    resp = requests.post(
+                        f"{API_BASE}/api/gaming/report/excel",
+                        headers=_headers(),
+                        json=payload,
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        st.download_button(
+                            label="⬇️ Download Excel",
+                            data=resp.content,
+                            file_name=f"gaming_test_{session_name or 'report'}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                        )
+                    elif resp.status_code == 501:
+                        st.error("Install openpyxl: pip install openpyxl")
+                    else:
+                        st.error(f"Export failed: {resp.text[:200]}")
+                except Exception as e:
+                    st.error(f"Export error: {e}")
+
+        with col_script:
+            if st.button("🤖 Generate Playwright Script", use_container_width=True):
+                payload = {
+                    "session_name": session_name,
+                    "min_bet": min_bet,
+                    "max_bet": max_bet,
+                    "currency": currency,
+                    "games": st.session_state.gaming_games,
+                }
+                result = api_post("/api/gaming/playwright-script", payload)
+                if result:
+                    st.code(result["script"], language="javascript")
+                    st.download_button(
+                        "⬇️ Download Script",
+                        result["script"],
+                        file_name="gaming_test.js",
+                        mime="text/javascript",
+                    )
+
+        if st.button("🗑️ Clear All Games", use_container_width=True):
+            st.session_state.gaming_games = []
+            st.rerun()
+    else:
+        st.info("Paste your game list above and click **Load Games** to start.")
+
+
 # ─── Router ───────────────────────────────────────────────────────────────────
 
 PAGE_MAP = {
     "Dashboard": page_dashboard,
     "Chat": page_chat,
+    "Gaming Tests": page_gaming_tests,
     "Test Cases": page_test_cases,
     "SQL Review": page_sql_review,
     "Security Review": page_security_review,
